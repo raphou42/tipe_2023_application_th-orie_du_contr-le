@@ -1,0 +1,136 @@
+import numpy.random as rd
+import math
+
+
+class Voiture:
+
+    def __init__(self, position_x, position_y,  # initialisation de la voiture
+                 vitesse_initial=rd.randint(1, 6), vmax=6, vmin=0, accelerationoriginel=0):
+        self.positionx = position_x
+        self.positiony = position_y
+        self.vitesse = vitesse_initial
+        self.acceleration = accelerationoriginel
+        self.vitessemax = vmax
+        self.vitessemin = vmin
+
+    def mouvement(self, mouvement="uniforme"):
+        self.positionx += self.vitesse
+        self.vitesse += self.acceleration
+        if mouvement == "droit":
+            self.positiony += 1
+        elif mouvement == "gauche":
+            self.positiony -= 1
+
+    def accelerer(self, valeur):  # valeur : -1, 1, 0
+        self.acceleration = valeur
+
+    def testvmax(self):
+        if self.vitesse == self.vitessemax and self.acceleration == 1:
+            self.acceleration = 0
+
+
+class Voitureincontrolable(Voiture):  # voiture mais avec des valeurs random (héritage de Voiture)
+    def __init__(self, positionx, positiony,
+                 vitesse_initial=rd.randint(1, 6),
+                 vmax=6, vmin=0, accelerationoriginel=0):
+        super().__init__(positionx, positiony,
+                         vitesse_initial,
+                         vmax, vmin, accelerationoriginel)
+
+    def testvmax(self):
+        super().testvmax()
+
+    def accelerer(self, a=None):
+        super().accelerer(rd.choice([0, -1, 1]))
+        self.testvmax()
+
+    def deplacement(self):
+        super().mouvement(rd.choice(["gauche", "droit", "uniforme"]))  # potentiellement à pondérer
+
+
+def creation_dico(liste_voiture):
+    deja_vu = {}
+    for i in liste_voiture:
+        deja_vu[i] = False
+    return deja_vu
+
+
+def creation_route(nb_voie, longueur):
+    return [[None for _ in range(nb_voie)] for _ in range(longueur)]
+
+
+def modif_route(route, v):  # place la voiture au bon endroit sur la route
+    route[v.positionx][v.positiony] = v
+
+
+def distance(v1, v2):  
+    return (v1.positionx - v2.positionx)**2 + (v1.positiony - v2.positiony)**2
+
+
+def recherche(voiture, deja_vu):
+    # trouve la voiture la plus proche pour la mettre dans notre file a trier
+    vproche = None
+    distancemin = math.inf
+    for v in deja_vu:
+        if not deja_vu[v]:
+            a = distance(voiture, v)
+            if a < distancemin:
+                distancemin = a
+                vproche = v
+    return vproche
+
+
+def algo_final(liste_voiture, voiture_non_ctr, nb_voie, longueur):
+    # objectif, toutes les voitures dehors en le moins d'iteration possible
+    route = creation_route(nb_voie, longueur)
+    nb_iterations = 0
+    for v in liste_voiture:
+        modif_route(route, v)  # initialisation de la route
+
+    deja_vu = creation_dico(liste_voiture)
+    deja_vu[voiture_non_ctr] = True
+    route_futur = creation_route(nb_voie, longueur)
+    voiture_non_ctr.mouvement()
+    modif_route(route_futur, voiture_non_ctr)
+    modif_route(route, voiture_non_ctr)
+    v_act = voiture_non_ctr
+    while route != creation_route(nb_voie, longueur):
+        if recherche(v_act, deja_vu) is None:
+            v_act = voiture_non_ctr
+            route = route_futur
+            nb_iterations += 1
+            deja_vu = creation_dico(liste_voiture)
+            deja_vu[voiture_non_ctr] = True
+            route_futur = creation_route(nb_voie, longueur)
+            voiture_non_ctr.mouvement()
+            modif_route(route_futur, voiture_non_ctr)
+            modif_route(route, voiture_non_ctr)
+        else:
+            v_act = recherche(v_act, deja_vu)
+            py = v_act.positiony
+            px = v_act.positionx
+            devant = True
+            gauche = True
+            droite = True
+            loin = py+v_act.vitesse
+            if loin > longueur:
+                loin = longueur
+            for i in range(py, loin):
+                if route_futur[px][i] is not None:
+                    devant = False
+                if px != 0:
+                    if route_futur[px-1][i] is not None:
+                        gauche = False
+                if px != nb_voie-1:
+                    if route_futur[px+1][i] is not None:
+                        droite = False
+            if devant:
+                v_act.mouvement()
+            elif gauche:
+                v_act.mouvement("gauche")
+            elif droite:
+                v_act.mouvement("droit")
+            else:
+                return "stratégie ne fonctionnant pas"
+            modif_route(route_futur, v_act)
+    return nb_iterations
